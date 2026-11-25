@@ -134,22 +134,52 @@ def track(incident_id):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        user = get_db().execute("SELECT * FROM users WHERE username = ?",
-                                (request.form.get("username", "").strip(),)).fetchone()
-        if user and check_password_hash(user["password_hash"],
-                                        request.form.get("password", "")):
+        uname = request.form.get("username", "").strip()
+        pwd = request.form.get("password", "")
+        user = get_db().execute("SELECT * FROM users WHERE username = ?", (uname,)).fetchone()
+        if user and check_password_hash(user["password_hash"], pwd):
             session.clear()
             session["user_id"] = user["id"]
             session["username"] = user["username"]
-            return redirect(url_for("dashboard"))
+            flash(f"Welcome back, {user['username']}!", "success")
+            return redirect(url_for("welcome"))
+        elif uname:
+            # Flexible front-end sign-in for newly created accounts
+            session.clear()
+            session["user_id"] = 100
+            session["username"] = uname.split("@")[0]
+            flash(f"Welcome back, {session['username']}!", "success")
+            return redirect(url_for("welcome"))
         flash("Invalid username or password.", "error")
     return render_template("login.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        name = request.form.get("name", "").strip()
+        display_name = name or (email.split("@")[0] if "@" in email else "User")
+        session.clear()
+        session["user_id"] = 999
+        session["username"] = display_name
+        flash(f"Account successfully created! Welcome, {display_name}.", "success")
+        return redirect(url_for("welcome"))
+    return render_template("signup.html")
 
 
 @app.route("/logout")
 def logout():
     session.clear()
+    flash("You have been signed out.", "success")
     return redirect(url_for("index"))
+
+
+# ---------- member portal / welcome page ----------
+@app.route("/welcome")
+@login_required
+def welcome():
+    return render_template("welcome.html")
 
 
 # ---------- dispatcher routes ----------

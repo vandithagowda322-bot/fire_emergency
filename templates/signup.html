@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Sign Up{% endblock %}
+{% block content %}
+<div style="max-width: 480px; margin: 2rem auto 3.5rem;">
+  <div class="card">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <div style="display: inline-flex; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(135deg, #fee2e2, #fecaca); align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 0.75rem;">
+        🔥
+      </div>
+      <h2 style="margin-bottom: 0.35rem;">Create an Account</h2>
+      <p class="muted" style="margin: 0; font-size: 0.92rem;">Register for the Emergency Response Portal</p>
+    </div>
+
+    <form method="post" id="signupForm" novalidate>
+      <label>
+        Full Name (Optional)
+        <input type="text" name="name" id="nameInput" placeholder="e.g. John Doe">
+      </label>
+
+      <label>
+        Email Address *
+        <input type="email" name="email" id="emailInput" placeholder="name@example.com" required>
+      </label>
+
+      <label>
+        Password *
+        <div style="position: relative;">
+          <input type="password" name="password" id="passwordInput" placeholder="Create a secure password" required style="padding-right: 42px;">
+          <button type="button" id="togglePassword" aria-label="Toggle password visibility" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-muted); padding: 4px;">
+            👁️
+          </button>
+        </div>
+      </label>
+
+      <!-- Password Strength Meter -->
+      <div style="margin-top: -0.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+          <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">Password Strength:</span>
+          <span id="strengthText" style="font-size: 0.78rem; font-weight: 700; color: #dc2626;">Too Weak</span>
+        </div>
+        <div style="height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden;">
+          <div id="strengthBar" style="height: 100%; width: 0%; background: #dc2626; transition: width 0.3s ease, background 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <!-- Password Requirements Interactive Checklist -->
+      <div style="background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
+          Password Requirements:
+        </div>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.82rem;">
+          <li id="req-length" class="req-item">
+            <span class="req-icon">✕</span> At least 8 characters
+          </li>
+          <li id="req-upper" class="req-item">
+            <span class="req-icon">✕</span> At least one uppercase letter (A-Z)
+          </li>
+          <li id="req-lower" class="req-item">
+            <span class="req-icon">✕</span> At least one lowercase letter (a-z)
+          </li>
+          <li id="req-number" class="req-item">
+            <span class="req-icon">✕</span> At least one number (0-9)
+          </li>
+          <li id="req-special" class="req-item">
+            <span class="req-icon">✕</span> At least one special character (!@#$%^&*...)
+          </li>
+        </ul>
+      </div>
+
+      <label>
+        Confirm Password *
+        <input type="password" name="confirm_password" id="confirmPasswordInput" placeholder="Re-enter your password" required>
+        <span id="matchFeedback" style="font-size: 0.8rem; font-weight: 600; display: none; margin-top: 0.2rem;"></span>
+      </label>
+
+      <button class="btn danger" type="submit" id="submitBtn" style="padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem;" disabled>
+        Complete Registration →
+      </button>
+    </form>
+
+    <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); text-align: center; font-size: 0.9rem;" class="muted">
+      Already have an account? 
+      <a href="{{ url_for('login') }}" style="color: var(--primary); font-weight: 600; text-decoration: none;">
+        Sign In here
+      </a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .req-item {
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    transition: color 0.2s ease;
+  }
+  .req-item .req-icon {
+    font-weight: 800;
+    font-size: 0.75rem;
+  }
+  .req-item.valid {
+    color: #166534;
+    font-weight: 600;
+  }
+  .req-item.valid .req-icon {
+    color: #16a34a;
+  }
+</style>
+
+<script>
+  const passwordInput = document.getElementById('passwordInput');
+  const confirmPasswordInput = document.getElementById('confirmPasswordInput');
+  const emailInput = document.getElementById('emailInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const togglePassword = document.getElementById('togglePassword');
+  const strengthBar = document.getElementById('strengthBar');
+  const strengthText = document.getElementById('strengthText');
+  const matchFeedback = document.getElementById('matchFeedback');
+
+  const reqLength = document.getElementById('req-length');
+  const reqUpper = document.getElementById('req-upper');
+  const reqLower = document.getElementById('req-lower');
+  const reqNumber = document.getElementById('req-number');
+  const reqSpecial = document.getElementById('req-special');
+
+  // Toggle password visibility
+  togglePassword.addEventListener('click', () => {
+    const isPassword = passwordInput.getAttribute('type') === 'password';
+    passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+    togglePassword.textContent = isPassword ? '🙈' : '👁️';
+  });
+
+  function validate() {
+    const val = passwordInput.value;
+    const confirmVal = confirmPasswordInput.value;
+
+    const hasLength = val.length >= 8;
+    const hasUpper = /[A-Z]/.test(val);
+    const hasLower = /[a-z]/.test(val);
+    const hasNumber = /[0-9]/.test(val);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(val);
+
+    updateReq(reqLength, hasLength);
+    updateReq(reqUpper, hasUpper);
+    updateReq(reqLower, hasLower);
+    updateReq(reqNumber, hasNumber);
+    updateReq(reqSpecial, hasSpecial);
+
+    // Score calculation
+    let passedCount = 0;
+    if (hasLength) passedCount++;
+    if (hasUpper) passedCount++;
+    if (hasLower) passedCount++;
+    if (hasNumber) passedCount++;
+    if (hasSpecial) passedCount++;
+
+    // Strength meter
+    if (passedCount <= 1) {
+      strengthBar.style.width = '20%';
+      strengthBar.style.background = '#dc2626';
+      strengthText.style.color = '#dc2626';
+      strengthText.textContent = 'Too Weak';
+    } else if (passedCount === 2 || passedCount === 3) {
+      strengthBar.style.width = '60%';
+      strengthBar.style.background = '#f59e0b';
+      strengthText.style.color = '#d97706';
+      strengthText.textContent = 'Moderate';
+    } else if (passedCount === 4) {
+      strengthBar.style.width = '80%';
+      strengthBar.style.background = '#3b82f6';
+      strengthText.style.color = '#2563eb';
+      strengthText.textContent = 'Good';
+    } else {
+      strengthBar.style.width = '100%';
+      strengthBar.style.background = '#16a34a';
+      strengthText.style.color = '#16a34a';
+      strengthText.textContent = 'Strong ✓';
+    }
+
+    // Match validation
+    let isMatch = false;
+    if (confirmVal.length > 0) {
+      matchFeedback.style.display = 'block';
+      if (val === confirmVal) {
+        matchFeedback.style.color = '#166534';
+        matchFeedback.textContent = '✓ Passwords match';
+        isMatch = true;
+      } else {
+        matchFeedback.style.color = '#dc2626';
+        matchFeedback.textContent = '✕ Passwords do not match';
+        isMatch = false;
+      }
+    } else {
+      matchFeedback.style.display = 'none';
+    }
+
+    const emailValid = emailInput.value.includes('@') && emailInput.value.includes('.');
+    const allMet = hasLength && hasUpper && hasLower && hasNumber && hasSpecial && isMatch && emailValid;
+    submitBtn.disabled = !allMet;
+  }
+
+  function updateReq(el, isValid) {
+    if (isValid) {
+      el.classList.add('valid');
+      el.querySelector('.req-icon').textContent = '✓';
+    } else {
+      el.classList.remove('valid');
+      el.querySelector('.req-icon').textContent = '✕';
+    }
+  }
+
+  passwordInput.addEventListener('input', validate);
+  confirmPasswordInput.addEventListener('input', validate);
+  emailInput.addEventListener('input', validate);
+</script>
+{% endblock %}

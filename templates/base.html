@@ -26,10 +26,12 @@
         <a href="{{ url_for('report') }}" class="nav-action">🚨 Report Fire</a>
         <a href="{{ url_for('track_lookup') }}">🔍 Track Status</a>
         {% if session.user_id %}
-        <a href="{{ url_for('dashboard') }}">📊 Dispatcher Dashboard</a>
+        <a href="{{ url_for('welcome') }}">🏠 Portal</a>
+        <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
         <a href="{{ url_for('logout') }}">🚪 Logout ({{ session.username }})</a>
         {% else %}
-        <a href="{{ url_for('login') }}">🔒 Dispatcher Login</a>
+        <a href="{{ url_for('signup') }}">✨ Sign Up</a>
+        <a href="{{ url_for('login') }}">🔒 Sign In</a>
         {% endif %}
       </nav>
     </div>
