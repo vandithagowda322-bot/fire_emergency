@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Report a Fire Incident{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-header-title">🚨 Report Fire Incident</h2>
+    <p class="page-header-sub">Provide exact details so our dispatchers can alert the nearest fire station immediately.</p>
+  </div>
+  <a href="{{ url_for('index') }}" class="btn outline-dark small-btn">← Back to Home</a>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start;">
+  <form method="post" class="card">
+    <div class="form-grid">
+      <label>
+        Full Name *
+        <input name="reporter_name" value="{{ form.get('reporter_name','') }}" placeholder="e.g. John Doe" required>
+        <span class="label-hint">At least 2 characters</span>
+      </label>
+      
+      <label>
+        Contact Phone *
+        <input name="phone" value="{{ form.get('phone','') }}" placeholder="e.g. 9876543210" required>
+        <span class="label-hint">10-13 digits for dispatch contact</span>
+      </label>
+    </div>
+
+    <label>
+      Exact Location / Landmark *
+      <input name="location" value="{{ form.get('location','') }}" placeholder="Building name, Street, Landmark, Sector/Area" required>
+      <span class="label-hint">Be as specific as possible (e.g. 2nd Floor, Grand Mall, MG Road)</span>
+    </label>
+
+    <label>
+      Incident Severity *
+      <select name="severity" required>
+        {% for s in severities %}
+          <option value="{{ s }}" {{ 'selected' if form.get('severity')==s }}>
+            {{ s }} {% if s == 'Critical' %}— Immediate threat to human life{% elif s == 'High' %}— Structural fire spreading{% elif s == 'Medium' %}— Contained building/vehicle fire{% else %}— Small outdoor/rubbish fire{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Situation Description *
+      <textarea name="description" rows="4" placeholder="Describe what is burning, smoke color/density, trapped occupants, chemical hazards..." required>{{ form.get('description','') }}</textarea>
+      <span class="label-hint">Provide any critical details that help firefighters prepare</span>
+    </label>
+
+    <button class="btn danger" type="submit" style="padding: 1rem; font-size: 1.05rem;">
+      🔥 Transmit Emergency Report
+    </button>
+  </form>
+
+  <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+    <div class="card small" style="background: #fef2f2; border-color: #fecaca;">
+      <h3 style="color: #991b1b; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <span>⚠️</span> Life Threat Warning
+      </h3>
+      <p style="color: #7f1d1d; font-size: 0.9rem; margin: 0 0 0.75rem 0;">
+        If you or others are in immediate danger:
+      </p>
+      <ol style="color: #7f1d1d; font-size: 0.88rem; margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.4rem;">
+        <li>Evacuate the building immediately.</li>
+        <li>Do not use elevators.</li>
+        <li>Close doors behind you to slow the fire.</li>
+        <li>Call <strong>101</strong> right now.</li>
+      </ol>
+    </div>
+
+    <div class="card small">
+      <h3 style="margin-bottom: 0.5rem;">What happens next?</h3>
+      <p class="muted" style="margin: 0; font-size: 0.88rem;">
+        Upon submission, you will receive a unique Tracking ID. Our 24/7 central dispatch will evaluate the report and mobilize units from the closest fire station.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

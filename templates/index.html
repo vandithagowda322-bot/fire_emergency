@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Emergency Fire Reporting & Response{% endblock %}
+{% block content %}
+<section class="hero-wrapper">
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="pulse-dot"></span>
+      24/7 Rapid Response Network
+    </div>
+    <h1 class="hero-title">Report a Fire. <span>Get Help Fast.</span></h1>
+    <p class="hero-subtitle">
+      Instant alert routing directly to regional fire dispatch stations. For active, life-threatening emergencies, evacuate immediately and call <strong>101</strong>.
+    </p>
+    <div class="hero-actions">
+      <a class="btn danger" href="{{ url_for('report') }}">
+        🚨 Report Incident Now
+      </a>
+      <a class="btn outline" href="{{ url_for('track_lookup') }}">
+        🔍 Track Existing Report
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="features-grid">
+  <div class="feature-card">
+    <div class="feature-icon-box">⚡</div>
+    <h3>Instant Dispatch</h3>
+    <p class="muted">Reports are instantly delivered to the nearest fire station with real-time unit allocation.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon-box">📍</div>
+    <h3>Live Tracking</h3>
+    <p class="muted">Track the status of your report from Dispatch to Arrival and final Resolution in real time.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon-box">🚒</div>
+    <h3>Station Readiness</h3>
+    <p class="muted">Centralized monitoring of ready fire engines, personnel, and emergency response teams.</p>
+  </div>
+</div>
+
+<div class="card" style="background: linear-gradient(to right, #ffffff, #f8fafc);">
+  <div class="page-header" style="margin-bottom: 0.75rem;">
+    <div>
+      <h3 style="margin-bottom: 0.25rem;">Quick Incident Lookup</h3>
+      <p class="muted" style="margin: 0;">Have a tracking ID from a previous report? Check current dispatch status.</p>
+    </div>
+  </div>
+  <form method="post" action="{{ url_for('track_lookup') }}" class="inline" style="margin-top: 0.5rem;">
+    <input name="incident_id" placeholder="Enter Tracking ID (e.g. 1)" inputmode="numeric" style="max-width: 280px;" required>
+    <button class="btn" type="submit">Track Incident →</button>
+  </form>
+</div>
+{% endblock %}

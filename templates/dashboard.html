@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dispatcher Command Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 class="page-header-title">🚒 Central Dispatch Command</h2>
+    <p class="page-header-sub">Live monitoring, station status, and rapid emergency dispatch.</p>
+  </div>
+  <div style="display: flex; gap: 0.5rem;">
+    <a href="{{ url_for('report') }}" class="btn danger small-btn">+ New Emergency Report</a>
+  </div>
+</div>
+
+<!-- Fire Stations Fleet Status -->
+<h3 style="margin-bottom: 0.75rem;">Active Fire Stations Fleet</h3>
+<div class="stations">
+  {% for s in stations %}
+  <div class="station-card">
+    <div class="station-name">{{ s.name }}</div>
+    <div class="station-area">📍 {{ s.area }}</div>
+    <div class="station-units">
+      Available Units:
+      <span class="unit-pill {% if s.available_units > 0 %}available{% else %}empty{% endif %}">
+        {{ s.available_units }} {% if s.available_units == 1 %}engine{% else %}engines{% endif %} ready
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filter Tabs -->
+<div class="page-header" style="margin-bottom: 1rem;">
+  <div class="filters-bar">
+    <a href="{{ url_for('dashboard') }}" class="{% if not flt %}active{% endif %}">
+      All Incidents ({{ incidents|length }})
+    </a>
+    {% for st in ['Reported', 'Dispatched', 'In Progress', 'Resolved'] %}
+    <a href="{{ url_for('dashboard', status=st) }}" class="{% if flt==st %}active{% endif %}">
+      {{ st }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Incidents Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Location & Reporter</th>
+        <th>Severity</th>
+        <th>Status</th>
+        <th>Assigned Station</th>
+        <th>Dispatch Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in incidents %}
+      <tr>
+        <td>
+          <a href="{{ url_for('track', incident_id=i.id) }}" class="mono-id" style="text-decoration: none;">
+            #{{ i.id }}
+          </a>
+        </td>
+        <td>
+          <div style="font-weight: 600; color: var(--text-main);">{{ i.location }}</div>
+          <div class="muted" style="font-size: 0.82rem; margin-top: 0.2rem;">
+            👤 {{ i.reporter_name }} · 📞 {{ i.phone }}
+          </div>
+          <div class="muted" style="font-size: 0.8rem; margin-top: 0.2rem;">
+            {{ i.description[:60] }}{% if i.description|length > 60 %}...{% endif %}
+          </div>
+        </td>
+        <td>
+          <span class="sev {{ i.severity|lower }}">{{ i.severity }}</span>
+        </td>
+        <td>
+          <span class="badge {{ i.status|replace(' ','-')|lower }}">{{ i.status }}</span>
+        </td>
+        <td>
+          {% if i.station_name %}
+          <span style="font-weight: 600;">🚒 {{ i.station_name }}</span>
+          {% else %}
+          <span class="muted">Unassigned</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if next_status.get(i.status) %}
+          <form method="post" action="{{ url_for('advance', incident_id=i.id) }}" class="inline">
+            {% if i.status == 'Reported' %}
+            <select name="station_id" required>
+              {% for s in stations %}
+              <option value="{{ s.id }}" {% if s.available_units < 1 %}disabled{% endif %}>
+                {{ s.name }} ({{ s.available_units }} units)
+              </option>
+              {% endfor %}
+            </select>
+            {% endif %}
+            <button class="btn small-btn {% if i.status == 'Reported' %}danger{% endif %}" type="submit">
+              → {{ next_status[i.status] }}
+            </button>
+          </form>
+          {% else %}
+          <span style="color: var(--success); font-weight: 700; font-size: 0.88rem;">✓ Resolved</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 2.5rem;" class="muted">
+          No incidents found in this filter category.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

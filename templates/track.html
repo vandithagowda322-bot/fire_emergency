@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Track Incident #{{ incident.id }}{% endblock %}
+{% block content %}
+<meta http-equiv="refresh" content="30">
+
+<div class="page-header">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <h2 class="page-header-title" style="margin: 0;">Incident Report #{{ incident.id }}</h2>
+      <span class="badge {{ incident.status|replace(' ','-')|lower }}">{{ incident.status }}</span>
+      <span class="sev {{ incident.severity|lower }}">{{ incident.severity }} Severity</span>
+    </div>
+    <p class="page-header-sub">Tracking updates in real time. Page auto-refreshes every 30 seconds.</p>
+  </div>
+  <a href="{{ url_for('track_lookup') }}" class="btn outline-dark small-btn">Lookup Another ID</a>
+</div>
+
+<!-- Status Stepper -->
+<div class="stepper-container">
+  <div class="stepper">
+    {% set steps = ['Reported', 'Dispatched', 'In Progress', 'Resolved'] %}
+    {% set current_idx = steps.index(incident.status) if incident.status in steps else 0 %}
+    {% for step in steps %}
+      {% set s_idx = loop.index0 %}
+      <div class="step-item {% if s_idx < current_idx %}completed{% elif s_idx == current_idx %}active{% endif %}">
+        <div class="step-circle">
+          {% if s_idx < current_idx %}
+            ✓
+          {% else %}
+            {{ loop.index }}
+          {% endif %}
+        </div>
+        <div class="step-label">{{ step }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+    Incident Details
+  </h3>
+
+  <div class="detail-grid">
+    <div class="detail-item">
+      <span class="detail-label">Location</span>
+      <span class="detail-value">📍 {{ incident.location }}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Assigned Station</span>
+      <span class="detail-value">🚒 {{ incident.station_name or 'Pending Station Assignment' }}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Reporter</span>
+      <span class="detail-value">{{ incident.reporter_name }} ({{ incident.phone }})</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Reported Timestamp</span>
+      <span class="detail-value">{{ incident.created_at }}</span>
+    </div>
+  </div>
+
+  <div style="margin-top: 1.25rem; padding: 1.25rem; background: var(--surface-alt); border-radius: var(--radius-sm);">
+    <span class="detail-label" style="display: block; margin-bottom: 0.4rem;">Situation Description</span>
+    <p style="margin: 0; font-size: 0.98rem; line-height: 1.6; color: var(--text-main);">
+      {{ incident.description }}
+    </p>
+  </div>
+
+  <div style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;" class="muted">
+    <span>Last updated by command center: <strong>{{ incident.updated_at }}</strong></span>
+    <span>Auto-refreshing in <strong id="refresh-timer">30</strong>s</span>
+  </div>
+</div>
+
+<script>
+  let sec = 30;
+  const timer = document.getElementById('refresh-timer');
+  if (timer) {
+    setInterval(() => {
+      sec--;
+      if (sec >= 0) timer.textContent = sec;
+    }, 1000);
+  }
+</script>
+{% endblock %}

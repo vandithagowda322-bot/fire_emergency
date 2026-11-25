@@ -1,0 +1,226 @@
+import re
+import sqlite3
+from datetime import datetime
+from functools import wraps
+
+from flask import (Flask, abort, flash, g, jsonify, redirect,
+                   render_template, request, session, url_for)
+from werkzeug.security import check_password_hash, generate_password_hash
+
+app = Flask(__name__)
+app.secret_key = "change-this-secret-key"
+DB = "fire_emergency.db"
+
+SEVERITIES = ["Low", "Medium", "High", "Critical"]
+NEXT_STATUS = {"Reported": "Dispatched", "Dispatched": "In Progress",
+               "In Progress": "Resolved"}
+
+
+# ---------- database helpers ----------
+def get_db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DB)
+        g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA foreign_keys = ON")
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(_exc):
+    db = g.pop("db", None)
+    if db:
+        db.close()
+
+
+def init_db():
+    db = sqlite3.connect(DB)
+    with open("schema.sql") as f:
+        db.executescript(f.read())
+    if not db.execute("SELECT 1 FROM users").fetchone():
+        db.execute("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)",
+                   ("admin", generate_password_hash("admin123"), "dispatcher"))
+    if not db.execute("SELECT 1 FROM stations").fetchone():
+        db.executemany("INSERT INTO stations (name, area, available_units) VALUES (?,?,?)",
+                       [("Central Fire Station", "City Centre", 4),
+                        ("North Fire Station", "North Zone", 3),
+                        ("South Fire Station", "South Zone", 3)])
+    db.commit()
+    db.close()
+
+
+def now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*a, **kw):
+        if "user_id" not in session:
+            flash("Please log in as a dispatcher.", "error")
+            return redirect(url_for("login"))
+        return view(*a, **kw)
+    return wrapped
+
+
+# ---------- validation ----------
+def validate_report(form):
+    errors = []
+    name = form.get("reporter_name", "").strip()
+    phone = form.get("phone", "").strip()
+    location = form.get("location", "").strip()
+    desc = form.get("description", "").strip()
+    severity = form.get("severity", "")
+    if len(name) < 2:
+        errors.append("Name must be at least 2 characters.")
+    if not re.fullmatch(r"\+?\d{10,13}", phone):
+        errors.append("Phone must be 10-13 digits (optional leading +).")
+    if len(location) < 5:
+        errors.append("Please give a more specific location.")
+    if len(desc) < 10:
+        errors.append("Description must be at least 10 characters.")
+    if severity not in SEVERITIES:
+        errors.append("Choose a valid severity.")
+    return errors, (name, phone, location, desc, severity)
+
+
+# ---------- public routes ----------
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/report", methods=["GET", "POST"])
+def report():
+    if request.method == "POST":
+        errors, data = validate_report(request.form)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("report.html", severities=SEVERITIES,
+                                   form=request.form), 400
+        db = get_db()
+        cur = db.execute(
+            """INSERT INTO incidents (reporter_name, phone, location, description,
+               severity, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,'Reported',?,?)""", (*data, now(), now()))
+        db.commit()
+        flash(f"Fire reported. Your tracking ID is #{cur.lastrowid}.", "success")
+        return redirect(url_for("track", incident_id=cur.lastrowid))
+    return render_template("report.html", severities=SEVERITIES, form={})
+
+
+@app.route("/track", methods=["GET", "POST"])
+def track_lookup():
+    if request.method == "POST":
+        iid = request.form.get("incident_id", "").strip()
+        if iid.isdigit():
+            return redirect(url_for("track", incident_id=int(iid)))
+        flash("Enter a numeric tracking ID.", "error")
+    return render_template("track_lookup.html")
+
+
+@app.route("/track/<int:incident_id>")
+def track(incident_id):
+    row = get_db().execute(
+        """SELECT i.*, s.name AS station_name FROM incidents i
+           LEFT JOIN stations s ON s.id = i.station_id WHERE i.id = ?""",
+        (incident_id,)).fetchone()
+    if not row:
+        abort(404)
+    return render_template("track.html", incident=row)
+
+
+# ---------- auth ----------
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        user = get_db().execute("SELECT * FROM users WHERE username = ?",
+                                (request.form.get("username", "").strip(),)).fetchone()
+        if user and check_password_hash(user["password_hash"],
+                                        request.form.get("password", "")):
+            session.clear()
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            return redirect(url_for("dashboard"))
+        flash("Invalid username or password.", "error")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("index"))
+
+
+# ---------- dispatcher routes ----------
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    db = get_db()
+    flt = request.args.get("status", "")
+    q = """SELECT i.*, s.name AS station_name FROM incidents i
+           LEFT JOIN stations s ON s.id = i.station_id"""
+    args = ()
+    if flt:
+        q += " WHERE i.status = ?"
+        args = (flt,)
+    q += """ ORDER BY CASE i.severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1
+             WHEN 'Medium' THEN 2 ELSE 3 END, i.created_at DESC"""
+    incidents = db.execute(q, args).fetchall()
+    stations = db.execute("SELECT * FROM stations").fetchall()
+    return render_template("dashboard.html", incidents=incidents,
+                           stations=stations, flt=flt, next_status=NEXT_STATUS)
+
+
+@app.route("/incident/<int:incident_id>/advance", methods=["POST"])
+@login_required
+def advance(incident_id):
+    db = get_db()
+    inc = db.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
+    if not inc:
+        abort(404)
+    new_status = NEXT_STATUS.get(inc["status"])
+    if not new_status:
+        flash("Incident is already resolved.", "error")
+        return redirect(url_for("dashboard"))
+
+    if new_status == "Dispatched":
+        station_id = request.form.get("station_id", type=int)
+        st = db.execute("SELECT * FROM stations WHERE id = ?", (station_id,)).fetchone()
+        if not st:
+            flash("Select a station to dispatch.", "error")
+            return redirect(url_for("dashboard"))
+        if st["available_units"] < 1:
+            flash(f"{st['name']} has no available units.", "error")
+            return redirect(url_for("dashboard"))
+        db.execute("UPDATE stations SET available_units = available_units - 1 WHERE id = ?",
+                   (station_id,))
+        db.execute("UPDATE incidents SET station_id = ? WHERE id = ?",
+                   (station_id, incident_id))
+    elif new_status == "Resolved" and inc["station_id"]:
+        db.execute("UPDATE stations SET available_units = available_units + 1 WHERE id = ?",
+                   (inc["station_id"],))
+
+    db.execute("UPDATE incidents SET status = ?, updated_at = ? WHERE id = ?",
+               (new_status, now(), incident_id))
+    db.commit()
+    flash(f"Incident #{incident_id} moved to {new_status}.", "success")
+    return redirect(url_for("dashboard"))
+
+
+# ---------- JSON API ----------
+@app.route("/api/incidents")
+@login_required
+def api_incidents():
+    rows = get_db().execute("SELECT * FROM incidents ORDER BY created_at DESC").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.errorhandler(404)
+def not_found(_e):
+    return render_template("404.html"), 404
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=True)

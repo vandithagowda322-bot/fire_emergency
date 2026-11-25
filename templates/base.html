@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Fire Emergency{% endblock %} | Rapid Response System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>">
+</head>
+
+<body>
+  <header>
+    <div class="header-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <div class="brand-icon">🔥</div>
+        <span class="brand-title">Fire Emergency</span>
+        <span class="brand-tag">Rapid Response</span>
+      </a>
+      <nav>
+        <div class="hotline-pill">
+          <span class="pulse-dot"></span>
+          <span>Emergency Hotline: <strong>101</strong></span>
+        </div>
+        <a href="{{ url_for('report') }}" class="nav-action">🚨 Report Fire</a>
+        <a href="{{ url_for('track_lookup') }}">🔍 Track Status</a>
+        {% if session.user_id %}
+        <a href="{{ url_for('dashboard') }}">📊 Dispatcher Dashboard</a>
+        <a href="{{ url_for('logout') }}">🚪 Logout ({{ session.username }})</a>
+        {% else %}
+        <a href="{{ url_for('login') }}">🔒 Dispatcher Login</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+      {% for cat, msg in messages %}
+      <div class="flash {{ cat }}">
+        {% if cat == 'success' %}
+        <span>✓</span>
+        {% else %}
+        <span>⚠</span>
+        {% endif %}
+        <span>{{ msg }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span>🔥 Fire Emergency Response Network</span>
+      </div>
+      <div class="footer-links">
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="{{ url_for('report') }}">Report Fire</a>
+        <a href="{{ url_for('track_lookup') }}">Track Incident</a>
+        <a href="{{ url_for('login') }}">Staff Portal</a>
+      </div>
+      <div class="footer-copy">
+        Emergency Fire Dispatch & Coordination System. In case of immediate life hazard, dial 101.
+      </div>
+    </div>
+  </footer>
+</body>
+
+</html>
