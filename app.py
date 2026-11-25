@@ -1,3 +1,4 @@
+import os
 import re
 import sqlite3
 from datetime import datetime
@@ -8,18 +9,62 @@ from flask import (Flask, abort, flash, g, jsonify, redirect,
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
-app.secret_key = "change-this-secret-key"
-DB = "fire_emergency.db"
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret-key")
+
+# Configure SQLite DB_PATH: use /tmp on Vercel's read-only serverless environment
+if os.environ.get("VERCEL"):
+    DB_PATH = "/tmp/fire_emergency.db"
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fire_emergency.db")
+
+DB = DB_PATH
 
 SEVERITIES = ["Low", "Medium", "High", "Critical"]
 NEXT_STATUS = {"Reported": "Dispatched", "Dispatched": "In Progress",
                "In Progress": "Resolved"}
 
 
-# ---------- database helpers ----------
+# ---------- database helpers & auto-initialization ----------
+def init_db():
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except OSError:
+            pass
+    db = sqlite3.connect(DB_PATH)
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys = ON")
+    schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
+    if os.path.exists(schema_path):
+        with open(schema_path, "r", encoding="utf-8") as f:
+            db.executescript(f.read())
+    else:
+        with open("schema.sql", "r", encoding="utf-8") as f:
+            db.executescript(f.read())
+    if not db.execute("SELECT 1 FROM users WHERE username = 'admin'").fetchone():
+        db.execute("INSERT OR IGNORE INTO users (username, password_hash, role) VALUES (?,?,?)",
+                   ("admin", generate_password_hash("admin123"), "dispatcher"))
+    if not db.execute("SELECT 1 FROM stations").fetchone():
+        db.executemany("INSERT OR IGNORE INTO stations (name, area, available_units) VALUES (?,?,?)",
+                       [("Central Fire Station", "City Centre", 4),
+                        ("North Fire Station", "North Zone", 3),
+                        ("South Fire Station", "South Zone", 3)])
+    db.commit()
+    db.close()
+
+
+@app.before_request
+def ensure_db():
+    if not os.path.exists(DB_PATH):
+        init_db()
+
+
 def get_db():
+    if not os.path.exists(DB_PATH):
+        init_db()
     if "db" not in g:
-        g.db = sqlite3.connect(DB)
+        g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
@@ -30,22 +75,6 @@ def close_db(_exc):
     db = g.pop("db", None)
     if db:
         db.close()
-
-
-def init_db():
-    db = sqlite3.connect(DB)
-    with open("schema.sql") as f:
-        db.executescript(f.read())
-    if not db.execute("SELECT 1 FROM users").fetchone():
-        db.execute("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)",
-                   ("admin", generate_password_hash("admin123"), "dispatcher"))
-    if not db.execute("SELECT 1 FROM stations").fetchone():
-        db.executemany("INSERT INTO stations (name, area, available_units) VALUES (?,?,?)",
-                       [("Central Fire Station", "City Centre", 4),
-                        ("North Fire Station", "North Zone", 3),
-                        ("South Fire Station", "South Zone", 3)])
-    db.commit()
-    db.close()
 
 
 def now():
